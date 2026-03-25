@@ -1,20 +1,28 @@
-yaml
-name: news
+name: finance-news-bot
+
 on:
-  workflow_dispatch:
   schedule:
     - cron: "0 23 * * *"
     - cron: "0 7 * * *"
     - cron: "0 13 * * *"
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
-      - run: pip install requests
-      - run: python news_bot_github.py
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch news and market data
         env:
           SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+        run: python news_bot_github.py
