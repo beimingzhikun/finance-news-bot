@@ -37,19 +37,30 @@ SENDKEY = os.environ.get('SERVERCHAN_SENDKEY', 'SCT328691TqGJDJfpEgA5noR3meGMVrK
 
 # ===== 第1部分：获取真实国际新闻 =====
 def fetch_reuters_news():
-    """从 Reuters RSS 获取最新国际财经新闻"""
+    """从 Reuters RSS 获取最新国际财经新闻（备用：FT/CNBC）"""
     news = []
-    feed = http_get('https://feeds.reuters.com/reuters/businessNews', H_REUTERS)
-    if feed:
+    # Reuters 在 GitHub Actions 上可能被墙，用多个备用源
+    sources = [
+        ('https://feeds.reuters.com/reuters/businessNews', 'Reuters'),
+        ('https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines', 'MarketWatch'),
+        ('https://cnbc.com/id/100003114/device/rss/rss.html', 'CNBC'),
+    ]
+    for feed_url, src_name in sources:
+        feed = http_get(feed_url, H_REUTERS)
+        if not feed:
+            continue
         items = re.findall(r'<item>(.*?)</item>', feed, re.DOTALL)
-        for item in items[:15]:
-            title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', item)
+        for item in items[:10]:
+            title_m = re.search(r'<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>', item, re.DOTALL)
             link_m = re.search(r'<link>(.*?)</link>', item)
             if title_m:
                 title = title_m.group(1).strip()
                 link = link_m.group(1).strip() if link_m else ''
                 if title and len(title) > 10 and not any(k in title.lower() for k in ['video', 'press release', 'podcast']):
-                    news.append({'title': title, 'source': 'Reuters', 'link': link})
+                    news.append({'title': title, 'source': src_name, 'link': link})
+        if news:
+            print("  {} ({} 条)".format(src_name, len(news)))
+            break
     return news
 
 def fetch_bbc_news():
@@ -145,13 +156,24 @@ def main():
             market['恒生指数'] = {'price': float(p[2]), 'pct': float(p[8]), 'chg': float(p[8])}
         except: pass
 
-    # 美股
+    # 美股（新浪 gb_ 接口：p[1]=现价, p[2]=涨跌额, p[3]=涨跌幅%, p[4]=昨收）
     for sym, name in [('gb_aapl','苹果'),('gb_ndx','纳斯达克100'),('gb_dji','道琼斯工业')]:
         p = get_sina_quote(sym)
         if p and len(p) > 4:
             try:
-                market[name] = {'price': p[1], 'pct': p[3], 'chg': p[3]}
-            except: pass
+                price = float(p[1])
+                # p[3] 是涨跌幅（如 "-1.23"），但有时字段错位，用昨收价计算兜底
+                try:
+                    pct = float(p[3])
+                    # 如果 pct 绝对值 > 50，说明字段错位了，用昨收价计算
+                    if abs(pct) > 50:
+                        raise ValueError("field mismatch")
+                except (ValueError, IndexError):
+                    prev = float(p[4]) if p[4] else price
+                    pct = round((price - prev) / prev * 100, 2) if prev else 0.0
+                market[name] = {'price': price, 'pct': pct}
+            except Exception as ex:
+                print("  [美股解析失败] {}: {}".format(name, ex))
 
     # 黄金
     p = get_sina_quote('hf_GC')
@@ -212,12 +234,13 @@ def main():
     for name in ['道琼斯工业','纳斯达克100','苹果','上证指数','沪深300','恒生指数']:
         if name in market:
             d = market[name]
-            if isinstance(d.get('price'), float):
-                pct_str = f"{'+' if d['pct']>=0 else ''}{d['pct']:.2f}%"
-                lines.append(f"{name}：{d['price']:.2f} ({pct_str})\n")
-            else:
-                pct_str = f"{'+' if float(d['pct'])>=0 else ''}{d['pct']}%"
-                lines.append(f"{name}：{d['price']} ({pct_str})\n")
+            try:
+                price = float(d['price'])
+                pct = float(d['pct'])
+                pct_str = "{}{:.2f}%".format('+' if pct >= 0 else '', pct)
+                lines.append("{}：{:.2f} ({})\n".format(name, price, pct_str))
+            except Exception as ex:
+                lines.append("{}：数据解析异常\n".format(name))
 
     lines.append("\n### 🥇 黄金市场\n\n")
     if '黄金期货' in market:
