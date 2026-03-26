@@ -63,10 +63,8 @@ def get_sina_hk():
     p = m.group(1).split(',')
     if len(p) > 8:news = fetch_news()
     print("  Total:", len(news))
-
 print("\n[2/4] Fetching market data ...")
     market = {}
-
     for sym, name in [('^DJI', '道琼斯工业'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500'), ('AAPL', '苹果')]:
         r = get_yahoo_quote(sym)
         if r:
