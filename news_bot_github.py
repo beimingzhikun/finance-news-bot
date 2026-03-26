@@ -14,8 +14,7 @@ def http_get(url, headers=None, timeout=15):
         req = urllib.request.Request(url, headers=headers or {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read().decode('utf-8', errors='replace')
-    except Exception as e:
-        print("[ERROR]", e)
+    except:
         return None
 
 def get_yahoo(symbol):
@@ -30,8 +29,7 @@ def get_yahoo(symbol):
         prev = meta.get('previousClose')
         if not price: return None
         pct = ((price - prev) / prev * 100) if prev and prev > 0 else 0
-        now = datetime.now().strftime("%H:%M")
-        return {'price': round(price, 2), 'pct': round(pct, 2), 'time': now}
+        return {'price': round(price, 2), 'pct': round(pct, 2)}
     except: return None
 
 def get_em(secid):
@@ -39,8 +37,7 @@ def get_em(secid):
     if not txt: return None
     try:
         d = json.loads(txt).get('data', {})
-        now = datetime.now().strftime("%H:%M")
-        return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2), 'time': now}
+        return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2)}
     except: return None
 
 def format_time(time_str):
@@ -61,49 +58,30 @@ def fetch_news():
         ('https://www.cnbc.com/id/100003114/device/rss/rss.html', 'CNBC'),
         ('https://feeds.a.dj.com/rss/RSSMarketsMain.xml', 'WSJ'),
     ]
-    
-    all_news = []
-    seen = set()
-    
+    all_news, seen = [], set()
     for url, src in sources:
-        print("  Fetching", src, "...")
         txt = http_get(url)
         if not txt: continue
-            
         items = re.findall(r'<item>(.*?)</item>', txt, re.DOTALL)
-        
         for item in items[:5]:
             title_m = re.search(r'<title>(.*?)</title>', item, re.DOTALL)
             if not title_m: continue
             title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title_m.group(1), flags=re.DOTALL)
             title = re.sub(r'<[^>]+>', '', title).strip()
-            
             if len(title) < 20: continue
-            
             key = title[:40].lower()
             if key in seen: continue
             seen.add(key)
-            
             desc_m = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
             desc = ''
             if desc_m:
                 desc = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', desc_m.group(1), flags=re.DOTALL)
                 desc = re.sub(r'<[^>]+>', '', desc).strip()
-                if len(desc) > 200:
-                    desc = desc[:197] + '...'
-            
+                if len(desc) > 200: desc = desc[:197] + '...'
             time_m = re.search(r'<pubDate>(.*?)</pubDate>', item, re.DOTALL)
             pub_time = format_time(time_m.group(1).strip()) if time_m else ''
-            
-            all_news.append({
-                'title': title,
-                'desc': desc,
-                'source': src,
-                'time': pub_time
-            })
-        
+            all_news.append({'title': title, 'desc': desc, 'source': src, 'time': pub_time})
         time.sleep(0.3)
-    
     return all_news
 
 def main():
@@ -117,32 +95,83 @@ def main():
 
     print("=" * 50)
     print("财经新闻汇总", ds, ts)
-    print("=" * 50)
 
+    # 1. 新闻
     print("\n[1/4] 获取新闻...")
     news = fetch_news()
     print("  共", len(news), "条")
 
+    # 2. 市场数据
     print("\n[2/4] 获取市场数据...")
     market = {}
-
-    for sym, name in [('^DJI', '道琼斯工业'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500'), ('AAPL', '苹果')]:
+    
+    # ========== 美股指数 ==========
+    print("  美股指数...")
+    for sym, name in [('^DJI', '道琼斯'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500')]:
         r = get_yahoo(sym)
-        if r:
-            market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance', 'time': r['time']}
+        if r: market[name] = r
         time.sleep(0.2)
-
-    for secid, name in [('1.000001', '上证指数'), ('1.000300', '沪深300')]:
+    
+    # 美股重要成分股
+    print("  美股成分股...")
+    for sym, name in [('AAPL', '苹果'), ('MSFT', '微软'), ('GOOGL', '谷歌'), ('AMZN', '亚马逊'), 
+                       ('NVDA', '英伟达'), ('TSLA', '特斯拉'), ('META', 'Meta'), ('JPM', '摩根大通')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    # ========== A股指数 ==========
+    print("  A股指数...")
+    for secid, name in [('1.000001', '上证指数'), ('1.000300', '沪深300'), ('0.399001', '深证成指'), ('0.399006', '创业板指')]:
         r = get_em(secid)
-        if r:
-            market[name] = {**r, 'src': '东方财富'}
-
-    for sym, name in [('GC=F', '黄金期货'), ('CL=F', 'WTI原油'), ('BZ=F', '布伦特原油')]:
+        if r: market[name] = r
+    
+    # A股重要成分股
+    print("  A股成分股...")
+    for secid, name in [('1.600519', '贵州茅台'), ('1.601318', '中国平安'), ('1.000858', '五粮液'), 
+                        ('1.600036', '招商银行'), ('1.000333', '美的集团'), ('1.002594', '比亚迪')]:
+        r = get_em(secid)
+        if r: market[name] = r
+    
+    # ========== 港股 ==========
+    print("  港股...")
+    for sym, name in [('^HSI', '恒生指数'), ('^HSCE', '国企指数')]:
         r = get_yahoo(sym)
-        if r:
-            market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance', 'time': r['time']}
+        if r: market[name] = r
         time.sleep(0.2)
+    
+    # ========== 黄金/贵金属 ==========
+    print("  黄金/贵金属...")
+    for sym, name in [('GC=F', 'COMEX黄金'), ('SI=F', 'COMEX白银'), ('HG=F', 'LME铜')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    # ========== 原油 ==========
+    print("  原油...")
+    for sym, name in [('CL=F', 'WTI原油'), ('BZ=F', '布伦特原油')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    # ========== 外汇 ==========
+    print("  外汇...")
+    for sym, name in [('DX-Y.NYB', '美元指数'), ('CNY=X', '美元/人民币'), ('EURUSD=X', '欧元/美元'), 
+                       ('GBPUSD=X', '英镑/美元'), ('USDJPY=X', '美元/日元')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    # ========== 债券收益率 ==========
+    print("  债券...")
+    for sym, name in [('^TNX', '美国10年期国债'), ('^FVX', '美国5年期国债'), ('^TYX', '美国30年期国债')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    print("\n  共", len(market), "项数据")
 
+    # 3. 生成报告
     print("\n[3/4] 生成报告...")
     
     lines = [
@@ -161,35 +190,134 @@ def main():
             lines.append("   " + n['desc'] + "\n")
         lines.append("   — " + n['source'] + time_str + "\n\n")
 
+    # ========== 市场摘要 ==========
     lines.append("\n---\n\n## 二、市场摘要\n")
     lines.append("**数据采集时间**: " + ts + "（北京时间）\n\n")
-    lines.append("### 📈 股指情况\n\n")
-
-    for name in ['道琼斯工业', '纳斯达克100', '标普500', '苹果', '上证指数', '沪深300']:
+    
+    # ----- 美股 -----
+    lines.append("### 📈 美股市场\n\n")
+    if '道琼斯' in market or '纳斯达克100' in market or '标普500' in market:
+        idx_str = []
+        for name in ['道琼斯', '纳斯达克100', '标普500']:
+            if name in market:
+                d = market[name]
+                pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+                idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
+        lines.append("**指数**: " + " | ".join(idx_str) + " — Yahoo Finance\n\n")
+    
+    # 科技股
+    tech = ['苹果', '微软', '谷歌', '亚马逊', '英伟达', '特斯拉', 'Meta']
+    tech_str = []
+    for name in tech:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            t = " " + d.get('time', ts) if d.get('time') else " " + ts
-            lines.append(name + "：" + str(d['price']) + " (" + pct + ") — " + d['src'] + t + "\n")
-
-    lines.append("\n### 🥇 黄金市场\n\n")
-    if '黄金期货' in market:
-        d = market['黄金期货']
-        pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-        t = " " + d.get('time', ts) if d.get('time') else " " + ts
-        lines.append("COMEX黄金期货：$" + str(d['price']) + "/盎司 (" + pct + ") — " + d['src'] + t + "\n")
-
-    lines.append("\n### 🛢️ 原油市场\n\n")
+            tech_str.append(name + ": " + pct)
+    if tech_str:
+        lines.append("**科技股**: " + " | ".join(tech_str) + "\n\n")
+    
+    # 金融股
+    fin = ['摩根大通']
+    fin_str = []
+    for name in fin:
+        if name in market:
+            d = market[name]
+            pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+            fin_str.append(name + ": " + pct)
+    if fin_str:
+        lines.append("**金融股**: " + " | ".join(fin_str) + "\n\n")
+    
+    # ----- A股 -----
+    lines.append("### 📈 A股市场\n\n")
+    if '上证指数' in market or '沪深300' in market:
+        idx_str = []
+        for name in ['上证指数', '深证成指', '沪深300', '创业板指']:
+            if name in market:
+                d = market[name]
+                pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+                idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
+        lines.append("**指数**: " + " | ".join(idx_str) + " — 东方财富\n\n")
+    
+    # A股权重股
+    weights = ['贵州茅台', '中国平安', '五粮液', '招商银行', '美的集团', '比亚迪']
+    weight_str = []
+    for name in weights:
+        if name in market:
+            d = market[name]
+            pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+            weight_str.append(name + ": " + pct)
+    if weight_str:
+        lines.append("**权重股**: " + " | ".join(weight_str) + "\n\n")
+    
+    # ----- 港股 -----
+    lines.append("### 📈 港股市场\n\n")
+    if '恒生指数' in market:
+        idx_str = []
+        for name in ['恒生指数', '国企指数']:
+            if name in market:
+                d = market[name]
+                pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+                idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
+        lines.append("**指数**: " + " | ".join(idx_str) + " — Yahoo Finance\n\n")
+    
+    # ----- 黄金/贵金属 -----
+    lines.append("### 🥇 黄金/贵金属\n\n")
+    metal_str = []
+    for name in ['COMEX黄金', 'COMEX白银', 'LME铜']:
+        if name in market:
+            d = market[name]
+            pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+            if '黄金' in name:
+                metal_str.append(name + ": $" + str(d['price']) + "/盎司 (" + pct + ")")
+            elif '白银' in name:
+                metal_str.append(name + ": $" + str(d['price']) + "/盎司 (" + pct + ")")
+            else:
+                metal_str.append(name + ": $" + str(d['price']) + "/磅 (" + pct + ")")
+    if metal_str:
+        lines.append(" | ".join(metal_str) + " — Yahoo Finance\n\n")
+    else:
+        lines.append("（暂不可用）\n\n")
+    
+    # ----- 原油 -----
+    lines.append("### 🛢️ 原油市场\n\n")
+    oil_str = []
     for name in ['WTI原油', '布伦特原油']:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            t = " " + d.get('time', ts) if d.get('time') else " " + ts
-            lines.append(name + "：$" + str(d['price']) + "/桶 (" + pct + ") — " + d['src'] + t + "\n")
+            oil_str.append(name + ": $" + str(d['price']) + "/桶 (" + pct + ")")
+    if oil_str:
+        lines.append(" | ".join(oil_str) + " — Yahoo Finance\n\n")
+    else:
+        lines.append("（暂不可用）\n\n")
+    
+    # ----- 外汇 -----
+    lines.append("### 💱 外汇市场\n\n")
+    fx_str = []
+    for name in ['美元指数', '美元/人民币', '欧元/美元', '英镑/美元', '美元/日元']:
+        if name in market:
+            d = market[name]
+            pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+            fx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
+    if fx_str:
+        lines.append(" | ".join(fx_str) + " — Yahoo Finance\n\n")
+    else:
+        lines.append("（暂不可用）\n\n")
+    
+    # ----- 债券 -----
+    lines.append("### 📊 债券市场（收益率）\n\n")
+    bond_str = []
+    for name in ['美国10年期国债', '美国5年期国债', '美国30年期国债']:
+        if name in market:
+            d = market[name]
+            pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+            bond_str.append(name + ": " + str(d['price']) + "% (" + pct + ")")
+    if bond_str:
+        lines.append(" | ".join(bond_str) + " — Yahoo Finance\n\n")
+    else:
+        lines.append("（暂不可用）\n\n")
 
-    lines.append("\n### 💱 外汇市场\n（暂不可用）\n")
-    lines.append("\n### 📊 债券市场\n（暂不可用）\n")
-    lines.append("\n---\n")
+    lines.append("---\n")
     lines.append("\n*数据截至北京时间 " + ts + " | 投资有风险，入市需谨慎*\n")
 
     desp = ''.join(lines)
