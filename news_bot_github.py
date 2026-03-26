@@ -18,7 +18,6 @@ def http_get(url, headers=None, timeout=15):
         return None
 
 def get_yahoo(symbol):
-    """Yahoo Finance - 返回实际数据时间"""
     url = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?interval=1d&range=2d"
     txt = http_get(url)
     if not txt: return None
@@ -30,37 +29,27 @@ def get_yahoo(symbol):
         prev = meta.get('previousClose')
         if not price: return None
         pct = ((price - prev) / prev * 100) if prev and prev > 0 else 0
-        
-        # 从timestamp获取实际数据时间
         timestamp = result.get('timestamp', [])
         if timestamp:
             last_ts = timestamp[-1]
             data_time = datetime.fromtimestamp(last_ts).strftime("%m/%d %H:%M")
         else:
             data_time = datetime.now().strftime("%m/%d %H:%M")
-        
         return {'price': round(price, 2), 'pct': round(pct, 2), 'time': data_time}
     except: return None
 
 def get_em(secid):
-    """东方财富 A股 - 显示实际收盘时间"""
     txt = http_get('https://push2.eastmoney.com/api/qt/stock/get?secid=' + secid + '&fields=f43,f170')
     if not txt: return None
     try:
         d = json.loads(txt).get('data', {})
-        
-        # A股收盘时间：工作日15:00
         now = datetime.now()
         hour = now.hour
-        
         if hour < 15:
-            # 盘前，数据是昨天15:00收盘
             yesterday = now - timedelta(days=1)
             data_time = yesterday.strftime("%m/%d") + " 15:00"
         else:
-            # 盘后，数据是今天15:00收盘
             data_time = now.strftime("%m/%d") + " 15:00"
-        
         return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2), 'time': data_time}
     except: return None
 
@@ -127,13 +116,27 @@ def main():
     print("\n[2/4] 获取市场数据...")
     market = {}
     
-    # 美股
+    # 美股指数
     for sym, name in [('^DJI', '道琼斯'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500')]:
         r = get_yahoo(sym)
         if r: market[name] = r
         time.sleep(0.2)
+    
+    # 美股科技股
     for sym, name in [('AAPL', '苹果'), ('MSFT', '微软'), ('GOOGL', '谷歌'), ('AMZN', '亚马逊'), 
-                       ('NVDA', '英伟达'), ('TSLA', '特斯拉'), ('META', 'Meta'), ('JPM', '摩根大通')]:
+                       ('NVDA', '英伟达'), ('TSLA', '特斯拉'), ('META', 'Meta')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    # 美股金融股
+    for sym, name in [('JPM', '摩根大通')]:
+        r = get_yahoo(sym)
+        if r: market[name] = r
+        time.sleep(0.2)
+    
+    # 中概股（必须包括京东、拼多多）
+    for sym, name in [('JD', '京东'), ('PDD', '拼多多'), ('BABA', '阿里巴巴'), ('BIDU', '百度'), ('NIO', '蔚来')]:
         r = get_yahoo(sym)
         if r: market[name] = r
         time.sleep(0.2)
@@ -213,6 +216,7 @@ def main():
                 idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
         lines.append("**指数**: " + " | ".join(idx_str) + "\n\n")
     
+    # 科技股
     tech = ['苹果', '微软', '谷歌', '亚马逊', '英伟达', '特斯拉', 'Meta']
     tech_str = []
     for name in tech:
@@ -223,6 +227,7 @@ def main():
     if tech_str:
         lines.append("**科技股**: " + " | ".join(tech_str) + "\n\n")
     
+    # 金融股
     fin = ['摩根大通']
     fin_str = []
     for name in fin:
@@ -232,6 +237,17 @@ def main():
             fin_str.append(name + ": $" + str(d['price']) + " (" + pct + ")")
     if fin_str:
         lines.append("**金融股**: " + " | ".join(fin_str) + "\n\n")
+    
+    # 中概股
+    cncpt = ['京东', '拼多多', '阿里巴巴', '百度', '蔚来']
+    cncpt_str = []
+    for name in cncpt:
+        if name in market:
+            d = market[name]
+            pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
+            cncpt_str.append(name + ": $" + str(d['price']) + " (" + pct + ")")
+    if cncpt_str:
+        lines.append("**中概股**: " + " | ".join(cncpt_str) + "\n\n")
     
     # ----- A股 -----
     cn_time = market.get('上证指数', {}).get('time', ts)
