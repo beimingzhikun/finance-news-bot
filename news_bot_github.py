@@ -30,7 +30,9 @@ def get_yahoo(symbol):
         prev = meta.get('previousClose')
         if not price: return None
         pct = ((price - prev) / prev * 100) if prev and prev > 0 else 0
-        return {'price': round(price, 2), 'pct': round(pct, 2)}
+        # 获取数据时间
+        now = datetime.now().strftime("%H:%M")
+        return {'price': round(price, 2), 'pct': round(pct, 2), 'time': now}
     except: return None
 
 def get_em(secid):
@@ -38,26 +40,22 @@ def get_em(secid):
     if not txt: return None
     try:
         d = json.loads(txt).get('data', {})
-        return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2)}
+        now = datetime.now().strftime("%H:%M")
+        return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2), 'time': now}
     except: return None
 
 # 翻译词典
 TRANS = {
-    # 人名/机构
     'Trump': '特朗普', 'Biden': '拜登', 'Fed': '美联储', 'Federal Reserve': '美联储',
     'Nagel': '纳格尔', 'Barrett': '巴雷特', 'Gorsuch': '戈萨奇', 'Powell': '鲍威尔',
     'Henkel': '汉高', 'Olaplex': '欧拉普莱克斯', 'Meta': 'Meta', 'YouTube': 'YouTube',
     'Next': 'Next', 'H&M': 'H&M', 'ECB': '欧洲央行', 'NS&I': '英国国民储蓄银行',
     'Octopus': 'Octopus能源', 'Iran': '伊朗', 'Israel': '以色列', 'Reuters': '路透社',
-    
-    # 国家地区
     'China': '中国', 'Chinese': '中国', 'US': '美国', 'U.S.': '美国', 'America': '美国', 'American': '美国',
     'Russia': '俄罗斯', 'Ukraine': '乌克兰', 'Europe': '欧洲', 'European': '欧洲',
     'UK': '英国', 'Germany': '德国', 'France': '法国', 'Middle East': '中东',
     'Japan': '日本', 'Japanese': '日本', 'Korea': '韩国', 'India': '印度',
     'Tehran': '德黑兰', 'Washington': '华盛顿',
-    
-    # 金融术语
     'stock': '股票', 'stocks': '股市', 'market': '市场', 'markets': '市场',
     'oil': '原油', 'gold': '黄金', 'bond': '债券', 'bonds': '债券',
     'rate': '利率', 'rates': '利率', 'interest': '利息', 'inflation': '通胀',
@@ -90,8 +88,6 @@ TRANS = {
     'troops': '军队', 'troop': '军队', 'more': '更多', 'but': '但', 'may': '可能',
     'nearing': '接近', 'disappoint': '不及预期', 'disappoints': '不及预期',
     'foreign minister': '外长', 'minister': '部长',
-    
-    # 动词
     'says': '表示', 'said': '表示', 'announced': '宣布', 'announces': '宣布',
     'warns': '警告', 'warned': '警告', 'expects': '预计', 'expected': '预计',
     'rise': '上涨', 'rises': '上涨', 'rising': '上涨', 'rose': '上涨',
@@ -107,14 +103,10 @@ TRANS = {
     'squeeze': '施压', 'backfire': '适得其反',
     'offer': '提出', 'found': '被认定',
     'set': '将', 'pay': '支付',
-    
-    # 形容词
     'high': '高点', 'low': '低点', 'record': '纪录',
     'weak': '疲软', 'strong': '强劲', 'major': '重大',
     'landmark': '里程碑式', 'cryptic': '神秘', 'prolonged': '长期',
     'key': '关键', 'latest': '最新',
-    
-    # 其他
     'meeting': '会议', 'summit': '峰会', 'talk': '会谈', 'talks': '会谈',
     'president': '总统', 'official': '官员', 'analysts': '分析师',
     'central bank': '央行', 'government': '政府',
@@ -135,12 +127,10 @@ TRANS = {
 }
 
 def translate(text):
-    """翻译文本"""
     result = text
     for en, zh in sorted(TRANS.items(), key=lambda x: -len(x[0])):
         if en and zh:
             result = re.sub(r'\b' + re.escape(en) + r'\b', zh, result, flags=re.IGNORECASE)
-    # 清理多余空格
     result = re.sub(r'\s+', ' ', result).strip()
     return result
 
@@ -185,7 +175,6 @@ def fetch_news():
             if key in seen: continue
             seen.add(key)
             
-            # 描述
             desc_m = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
             desc = ''
             if desc_m:
@@ -194,11 +183,9 @@ def fetch_news():
                 if len(desc) > 200:
                     desc = desc[:197] + '...'
             
-            # 中文翻译
             title_zh = translate(title)
             desc_zh = translate(desc) if desc else ''
             
-            # 时间
             time_m = re.search(r'<pubDate>(.*?)</pubDate>', item, re.DOTALL)
             pub_time = format_time(time_m.group(1).strip()) if time_m else ''
             
@@ -234,11 +221,12 @@ def main():
 
     print("\n[2/4] 获取市场数据...")
     market = {}
+    market_time = ts  # 数据采集时间
 
     for sym, name in [('^DJI', '道琼斯工业'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500'), ('AAPL', '苹果')]:
         r = get_yahoo(sym)
         if r:
-            market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance'}
+            market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance', 'time': r['time']}
         time.sleep(0.2)
 
     for secid, name in [('1.000001', '上证指数'), ('1.000300', '沪深300')]:
@@ -249,7 +237,7 @@ def main():
     for sym, name in [('GC=F', '黄金期货'), ('CL=F', 'WTI原油'), ('BZ=F', '布伦特原油')]:
         r = get_yahoo(sym)
         if r:
-            market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance'}
+            market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance', 'time': r['time']}
         time.sleep(0.2)
 
     print("\n[3/4] 生成报告...")
@@ -265,39 +253,40 @@ def main():
 
     for i, n in enumerate(news[:15], 1):
         time_str = " " + n['time'] if n['time'] else ""
-        # 英文标题
         lines.append("**" + str(i) + ". " + n['title'] + "**\n")
-        # 英文摘要
         if n['desc']:
             lines.append("   " + n['desc'] + "\n")
-        # 中文翻译
         lines.append("   🇨🇳 " + n['title_zh'])
         if n['desc_zh']:
             lines.append("：" + n['desc_zh'])
         lines.append("\n")
-        # 信源
         lines.append("   — " + n['source'] + time_str + "\n\n")
 
-    lines.append("\n---\n\n## 二、市场摘要\n\n### 📈 股指情况\n\n")
+    lines.append("\n---\n\n## 二、市场摘要\n")
+    lines.append("**数据采集时间**: " + ts + "（北京时间）\n\n")
+    lines.append("### 📈 股指情况\n\n")
 
     for name in ['道琼斯工业', '纳斯达克100', '标普500', '苹果', '上证指数', '沪深300']:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            lines.append(name + "：" + str(d['price']) + " (" + pct + ") — " + d['src'] + "\n")
+            t = " " + d.get('time', ts) if d.get('time') else " " + ts
+            lines.append(name + "：" + str(d['price']) + " (" + pct + ") — " + d['src'] + t + "\n")
 
     lines.append("\n### 🥇 黄金市场\n\n")
     if '黄金期货' in market:
         d = market['黄金期货']
         pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-        lines.append("COMEX黄金期货：$" + str(d['price']) + "/盎司 (" + pct + ") — " + d['src'] + "\n")
+        t = " " + d.get('time', ts) if d.get('time') else " " + ts
+        lines.append("COMEX黄金期货：$" + str(d['price']) + "/盎司 (" + pct + ") — " + d['src'] + t + "\n")
 
     lines.append("\n### 🛢️ 原油市场\n\n")
     for name in ['WTI原油', '布伦特原油']:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            lines.append(name + "：$" + str(d['price']) + "/桶 (" + pct + ") — " + d['src'] + "\n")
+            t = " " + d.get('time', ts) if d.get('time') else " " + ts
+            lines.append(name + "：$" + str(d['price']) + "/桶 (" + pct + ") — " + d['src'] + t + "\n")
 
     lines.append("\n### 💱 外汇市场\n（暂不可用）\n")
     lines.append("\n### 📊 债券市场\n（暂不可用）\n")
