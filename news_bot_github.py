@@ -40,8 +40,8 @@ def get_em(secid):
         return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2)}
     except: return None
 
-# 新闻翻译字典（常见词汇）
-TRANSLATE = {
+# 翻译词典
+TRANS = {
     'Trump': '特朗普', 'Biden': '拜登', 'Fed': '美联储', 'Federal Reserve': '美联储',
     'China': '中国', 'Chinese': '中国', 'US': '美国', 'America': '美国', 'American': '美国',
     'Russia': '俄罗斯', 'Ukraine': '乌克兰', 'Iran': '伊朗', 'Israel': '以色列',
@@ -76,30 +76,49 @@ TRANSLATE = {
     'president': '总统', 'minister': '部长', 'official': '官员',
     'central bank': '央行', 'government': '政府',
     'policy': '政策', 'policies': '政策',
-    'decision': '决定', 'decision': '决议',
-    'vote': '投票', 'election': '选举',
+    'decision': '决定', 'vote': '投票', 'election': '选举',
     'Supreme Court': '最高法院', 'Congress': '国会', 'Senate': '参议院',
     'Wall Street': '华尔街', 'White House': '白宫',
+    'Treasury': '财政部', 'Securities': '证券',
+    'Bitcoin': '比特币', 'crypto': '加密货币', 'cryptocurrency': '加密货币',
+    'AI': '人工智能', 'technology': '科技', 'tech': '科技',
+    'semiconductor': '半导体', 'chip': '芯片', 'chips': '芯片',
+    'auto': '汽车', 'automaker': '汽车制造商', 'vehicle': '车辆',
+    'energy': '能源', 'gas': '天然气', 'coal': '煤炭',
+    'steel': '钢铁', 'metal': '金属', 'copper': '铜',
+    'agriculture': '农业', 'food': '食品', 'grain': '粮食',
+    'housing': '住房', 'real estate': '房地产', 'property': '房产',
+    'employment': '就业', 'job': '工作', 'jobs': '就业', 'unemployment': '失业',
+    'wage': '工资', 'wages': '工资', 'salary': '薪资',
+    'consumer': '消费者', 'retail': '零售', 'sales': '销售',
+    'manufacturing': '制造业', 'factory': '工厂',
+    'export': '出口', 'imports': '进口', 'import': '进口',
+    'currency': '货币', 'dollar': '美元', 'yuan': '人民币', 'euro': '欧元', 'yen': '日元',
+    'exchange': '交易所', 'trading': '交易', 'trade': '交易',
+    'merger': '并购', 'acquisition': '收购', 'IPO': '上市',
+    'profit': '利润', 'revenue': '营收', 'earnings': '盈利',
+    'debt': '债务', 'loan': '贷款', 'credit': '信贷',
+    'budget': '预算', 'deficit': '赤字', 'surplus': '盈余',
+    'GDP': 'GDP', 'PMI': 'PMI', 'CPI': 'CPI',
 }
 
-def translate_title(title):
-    """翻译新闻标题"""
-    result = title
-    for en, zh in TRANSLATE.items():
-        result = re.sub(r'\b' + en + r'\b', zh, result, flags=re.IGNORECASE)
+def translate(text):
+    """翻译文本"""
+    result = text
+    for en, zh in sorted(TRANS.items(), key=lambda x: -len(x[0])):
+        result = re.sub(r'\b' + re.escape(en) + r'\b', zh, result, flags=re.IGNORECASE)
     return result
 
 def format_time(time_str):
     """格式化时间"""
     try:
-        # 尝试解析各种时间格式
         for fmt in ['%a, %d %b %Y %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%d %b %Y %H:%M:%S']:
             try:
                 dt = datetime.strptime(time_str[:25], fmt)
                 return dt.strftime('%m月%d日 %H:%M')
             except: pass
     except: pass
-    return time_str[:16] if len(time_str) > 16 else ''
+    return ''
 
 def fetch_news():
     """抓取新闻"""
@@ -109,7 +128,6 @@ def fetch_news():
         ('https://feeds.bloomberg.com/markets/news.rss', 'Bloomberg'),
         ('https://www.cnbc.com/id/100003114/device/rss/rss.html', 'CNBC'),
         ('https://feeds.a.dj.com/rss/RSSMarketsMain.xml', 'WSJ'),
-        ('https://www.ft.com/rss/home', 'FT'),
     ]
     
     all_news = []
@@ -123,39 +141,31 @@ def fetch_news():
             
         items = re.findall(r'<item>(.*?)</item>', txt, re.DOTALL)
         
-        for item in items[:5]:  # 每个源取5条
-            # 标题
+        for item in items[:5]:
             title_m = re.search(r'<title>(.*?)</title>', item, re.DOTALL)
             if not title_m:
                 continue
-            title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title_m.group(1), flags=re.DOTALL)
-            title = re.sub(r'<[^>]+>', '', title).strip()
+            title_en = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title_m.group(1), flags=re.DOTALL)
+            title_en = re.sub(r'<[^>]+>', '', title_en).strip()
             
-            if len(title) < 20:
+            if len(title_en) < 20:
                 continue
             
-            # 过滤重复
-            key = title[:40].lower()
+            key = title_en[:40].lower()
             if key in seen:
                 continue
             seen.add(key)
             
-            # 发布时间
             time_m = re.search(r'<pubDate>(.*?)</pubDate>', item, re.DOTALL)
             pub_time = format_time(time_m.group(1).strip()) if time_m else ''
             
-            # 翻译
-            title_zh = translate_title(title)
-            
-            # 生成简要摘要（取标题前50字）
-            summary = title_zh[:60] + '...' if len(title_zh) > 60 else title_zh
+            title_zh = translate(title_en)
             
             all_news.append({
-                'title': title_zh,
-                'title_en': title,
+                'title_en': title_en,
+                'title_zh': title_zh,
                 'source': src,
-                'time': pub_time,
-                'summary': summary
+                'time': pub_time
             })
         
         time.sleep(0.3)
@@ -175,12 +185,10 @@ def main():
     print("财经新闻汇总", ds, ts)
     print("=" * 50)
 
-    # 1. 新闻
     print("\n[1/4] 获取新闻...")
     news = fetch_news()
     print("  共", len(news), "条")
 
-    # 2. 市场数据
     print("\n[2/4] 获取市场数据...")
     market = {}
 
@@ -188,25 +196,24 @@ def main():
         r = get_yahoo(sym)
         if r:
             market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance'}
-            print("  OK", name, ":", r['price'], "(" + str(r['pct']) + "%)")
+            print("  OK", name)
         time.sleep(0.2)
 
     for secid, name in [('1.000001', '上证指数'), ('1.000300', '沪深300')]:
         r = get_em(secid)
         if r:
             market[name] = {**r, 'src': '东方财富'}
-            print("  OK", name, ":", r['price'], "(" + str(r['pct']) + "%)")
+            print("  OK", name)
 
     for sym, name in [('GC=F', '黄金期货'), ('CL=F', 'WTI原油'), ('BZ=F', '布伦特原油')]:
         r = get_yahoo(sym)
         if r:
             market[name] = {'price': r['price'], 'pct': r['pct'], 'src': 'Yahoo Finance'}
-            print("  OK", name, ":", r['price'], "(" + str(r['pct']) + "%)")
+            print("  OK", name)
         time.sleep(0.2)
 
     print("\n  共", len(market), "项")
 
-    # 3. 生成报告
     print("\n[3/4] 生成报告...")
     
     lines = [
@@ -219,9 +226,13 @@ def main():
     ]
 
     for i, n in enumerate(news[:15], 1):
-        time_str = " | " + n['time'] if n['time'] else ""
-        lines.append("**" + str(i) + ". " + n['title'] + "**\n")
-        lines.append("   信源: " + n['source'] + time_str + "\n\n")
+        time_str = " " + n['time'] if n['time'] else ""
+        # 英文标题
+        lines.append("**" + str(i) + ". " + n['title_en'] + "**\n")
+        # 中文翻译（单独一行）
+        lines.append("> " + n['title_zh'] + "\n")
+        # 信源 + 时间
+        lines.append("信源: " + n['source'] + time_str + "\n\n")
 
     lines.append("\n---\n\n## 二、市场摘要\n\n### 📈 股指情况\n\n")
 
@@ -252,7 +263,6 @@ def main():
     desp = ''.join(lines)
     title = "财经新闻汇总 " + ts
 
-    # 4. 保存推送
     print("\n[4/4] 保存并推送...")
     os.makedirs('/tmp/reports', exist_ok=True)
     with open('/tmp/reports/' + fn + '.md', 'w', encoding='utf-8') as f:
