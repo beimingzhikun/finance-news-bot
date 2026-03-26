@@ -18,7 +18,7 @@ def http_get(url, headers=None, timeout=15):
         return None
 
 def get_yahoo(symbol):
-    """Yahoo Finance - 美股/港股/外汇/债券是实时的"""
+    """Yahoo Finance - 返回实际数据时间"""
     url = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?interval=1d&range=2d"
     txt = http_get(url)
     if not txt: return None
@@ -31,7 +31,7 @@ def get_yahoo(symbol):
         if not price: return None
         pct = ((price - prev) / prev * 100) if prev and prev > 0 else 0
         
-        # 获取数据时间戳
+        # 从timestamp获取实际数据时间
         timestamp = result.get('timestamp', [])
         if timestamp:
             last_ts = timestamp[-1]
@@ -42,75 +42,24 @@ def get_yahoo(symbol):
         return {'price': round(price, 2), 'pct': round(pct, 2), 'time': data_time}
     except: return None
 
-def get_yahoo_commodity(symbol):
-    """Yahoo Finance 商品期货 - 显示交易时段"""
-    url = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?interval=1d&range=2d"
-    txt = http_get(url)
-    if not txt: return None
-    try:
-        data = json.loads(txt)
-        result = data.get('chart', {}).get('result', [{}])[0]
-        meta = result.get('meta', {})
-        price = meta.get('regularMarketPrice')
-        prev = meta.get('previousClose')
-        if not price: return None
-        pct = ((price - prev) / prev * 100) if prev and prev > 0 else 0
-        
-        # 商品期货交易时间
-        now = datetime.now()
-        hour = now.hour
-        if 0 <= hour < 6:
-            # 凌晨时段，显示前一天收盘
-            data_time = "前日收盘"
-        elif 6 <= hour < 9:
-            # 早盘前
-            data_time = "电子盘"
-        elif 9 <= hour < 15:
-            # 日间交易
-            data_time = now.strftime("%m/%d %H:%M")
-        elif 15 <= hour < 18:
-            # 下午，可能已收盘
-            data_time = now.strftime("%m/%d %H:%M")
-        else:
-            # 晚间交易
-            data_time = now.strftime("%m/%d %H:%M")
-        
-        return {'price': round(price, 2), 'pct': round(pct, 2), 'time': data_time}
-    except: return None
-
 def get_em(secid):
-    """东方财富 A股 - 15:00收盘，之后显示收盘价"""
+    """东方财富 A股 - 显示实际收盘时间"""
     txt = http_get('https://push2.eastmoney.com/api/qt/stock/get?secid=' + secid + '&fields=f43,f170')
     if not txt: return None
     try:
         d = json.loads(txt).get('data', {})
         
-        # A股交易时间判断
+        # A股收盘时间：工作日15:00
         now = datetime.now()
         hour = now.hour
-        minute = now.minute
         
-        # A股交易时段: 9:30-11:30, 13:00-15:00
-        if hour < 9 or (hour == 9 and minute < 30):
-            # 开盘前，显示昨收
-            data_time = "昨收"
-        elif (hour == 9 and minute >= 30) or (hour == 10) or (hour == 11 and minute <= 30):
-            # 早盘
-            data_time = now.strftime("%m/%d %H:%M")
-        elif hour == 12 or (hour == 11 and minute > 30):
-            # 午休
-            data_time = "早盘收盘"
-        elif hour == 13 or (hour == 14):
-            # 午盘
-            data_time = now.strftime("%m/%d %H:%M")
-        elif hour == 15 and minute == 0:
-            # 刚收盘
-            data_time = "15:00收盘"
-        elif hour >= 15:
-            # 收盘后
-            data_time = "收盘"
+        if hour < 15:
+            # 盘前，数据是昨天15:00收盘
+            yesterday = now - timedelta(days=1)
+            data_time = yesterday.strftime("%m/%d") + " 15:00"
         else:
-            data_time = now.strftime("%m/%d %H:%M")
+            # 盘后，数据是今天15:00收盘
+            data_time = now.strftime("%m/%d") + " 15:00"
         
         return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2), 'time': data_time}
     except: return None
@@ -178,7 +127,7 @@ def main():
     print("\n[2/4] 获取市场数据...")
     market = {}
     
-    # 美股（实时）
+    # 美股
     for sym, name in [('^DJI', '道琼斯'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500')]:
         r = get_yahoo(sym)
         if r: market[name] = r
@@ -189,7 +138,7 @@ def main():
         if r: market[name] = r
         time.sleep(0.2)
     
-    # A股（收盘）
+    # A股
     for secid, name in [('1.000001', '上证指数'), ('1.000300', '沪深300'), ('0.399001', '深证成指'), ('0.399006', '创业板指')]:
         r = get_em(secid)
         if r: market[name] = r
@@ -198,32 +147,32 @@ def main():
         r = get_em(secid)
         if r: market[name] = r
     
-    # 港股（实时，但16:00收盘）
+    # 港股
     for sym, name in [('^HSI', '恒生指数'), ('^HSCE', '国企指数')]:
         r = get_yahoo(sym)
         if r: market[name] = r
         time.sleep(0.2)
     
-    # 黄金/贵金属（商品期货）
+    # 黄金/贵金属
     for sym, name in [('GC=F', 'COMEX黄金'), ('SI=F', 'COMEX白银'), ('HG=F', 'LME铜')]:
-        r = get_yahoo_commodity(sym)
+        r = get_yahoo(sym)
         if r: market[name] = r
         time.sleep(0.2)
     
-    # 原油（商品期货）
+    # 原油
     for sym, name in [('CL=F', 'WTI原油'), ('BZ=F', '布伦特原油')]:
-        r = get_yahoo_commodity(sym)
+        r = get_yahoo(sym)
         if r: market[name] = r
         time.sleep(0.2)
     
-    # 外汇（24小时）
+    # 外汇
     for sym, name in [('DX-Y.NYB', '美元指数'), ('CNY=X', '美元/人民币'), ('EURUSD=X', '欧元/美元'), 
                        ('GBPUSD=X', '英镑/美元'), ('USDJPY=X', '美元/日元')]:
         r = get_yahoo(sym)
         if r: market[name] = r
         time.sleep(0.2)
     
-    # 债券（实时）
+    # 债券
     for sym, name in [('^TNX', '美国10年期国债'), ('^FVX', '美国5年期国债'), ('^TYX', '美国30年期国债')]:
         r = get_yahoo(sym)
         if r: market[name] = r
@@ -285,7 +234,7 @@ def main():
         lines.append("**金融股**: " + " | ".join(fin_str) + "\n\n")
     
     # ----- A股 -----
-    cn_time = market.get('上证指数', {}).get('time', '收盘')
+    cn_time = market.get('上证指数', {}).get('time', ts)
     lines.append("### 📈 A股市场\n")
     lines.append("*采集时间: " + cn_time + " | 数据源: 东方财富*\n\n")
     if '上证指数' in market or '沪深300' in market:
