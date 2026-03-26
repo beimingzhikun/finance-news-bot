@@ -199,23 +199,25 @@ def main():
                 idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
         lines.append("**指数**: " + " | ".join(idx_str) + "\n\n")
     
+    # 科技股（显示股价+涨跌幅）
     tech = ['苹果', '微软', '谷歌', '亚马逊', '英伟达', '特斯拉', 'Meta']
     tech_str = []
     for name in tech:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            tech_str.append(name + ": " + pct)
+            tech_str.append(name + ": $" + str(d['price']) + " (" + pct + ")")
     if tech_str:
         lines.append("**科技股**: " + " | ".join(tech_str) + "\n\n")
     
+    # 金融股（显示股价+涨跌幅）
     fin = ['摩根大通']
     fin_str = []
     for name in fin:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            fin_str.append(name + ": " + pct)
+            fin_str.append(name + ": $" + str(d['price']) + " (" + pct + ")")
     if fin_str:
         lines.append("**金融股**: " + " | ".join(fin_str) + "\n\n")
     
@@ -231,13 +233,14 @@ def main():
                 idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
         lines.append("**指数**: " + " | ".join(idx_str) + "\n\n")
     
+    # A股权重股（显示股价+涨跌幅）
     weights = ['贵州茅台', '中国平安', '五粮液', '招商银行', '美的集团', '比亚迪']
     weight_str = []
     for name in weights:
         if name in market:
             d = market[name]
             pct = "+" + str(round(d['pct'], 2)) + "%" if d['pct'] >= 0 else str(round(d['pct'], 2)) + "%"
-            weight_str.append(name + ": " + pct)
+            weight_str.append(name + ": " + str(d['price']) + "元 (" + pct + ")")
     if weight_str:
         lines.append("**权重股**: " + " | ".join(weight_str) + "\n\n")
     
