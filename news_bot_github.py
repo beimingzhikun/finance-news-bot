@@ -97,6 +97,29 @@ def fetch_news():
         time.sleep(0.3)
     return all_news
 
+def save_archive(content, title, ts):
+    """保存推送内容到本地存档"""
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%H-%M")
+    
+    # 存档目录: workspace/archives/YYYY-MM-DD/
+    archive_dir = os.path.join('/tmp', 'archives', date_str)
+    os.makedirs(archive_dir, exist_ok=True)
+    
+    # 文件名: HH-MM-财经新闻汇总.md
+    filename = time_str + '-财经新闻汇总.md'
+    filepath = os.path.join(archive_dir, filename)
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write('# ' + title + '\n\n')
+        f.write('**推送时间**: ' + now.strftime("%Y-%m-%d %H:%M:%S") + '\n\n')
+        f.write('---\n\n')
+        f.write(content)
+    
+    print("  已存档到:", filepath)
+    return filepath
+
 def main():
     now = datetime.now()
     ts = now.strftime("%H:%M")
@@ -135,7 +158,7 @@ def main():
         if r: market[name] = r
         time.sleep(0.2)
     
-    # 中概股（必须包括京东、拼多多）
+    # 中概股
     for sym, name in [('JD', '京东'), ('PDD', '拼多多'), ('BABA', '阿里巴巴'), ('BIDU', '百度'), ('NIO', '蔚来')]:
         r = get_yahoo(sym)
         if r: market[name] = r
@@ -216,7 +239,6 @@ def main():
                 idx_str.append(name + ": " + str(d['price']) + " (" + pct + ")")
         lines.append("**指数**: " + " | ".join(idx_str) + "\n\n")
     
-    # 科技股
     tech = ['苹果', '微软', '谷歌', '亚马逊', '英伟达', '特斯拉', 'Meta']
     tech_str = []
     for name in tech:
@@ -227,7 +249,6 @@ def main():
     if tech_str:
         lines.append("**科技股**: " + " | ".join(tech_str) + "\n\n")
     
-    # 金融股
     fin = ['摩根大通']
     fin_str = []
     for name in fin:
@@ -238,7 +259,6 @@ def main():
     if fin_str:
         lines.append("**金融股**: " + " | ".join(fin_str) + "\n\n")
     
-    # 中概股
     cncpt = ['京东', '拼多多', '阿里巴巴', '百度', '蔚来']
     cncpt_str = []
     for name in cncpt:
@@ -355,10 +375,16 @@ def main():
     title = "财经新闻汇总 " + ts
 
     print("\n[4/4] 保存并推送...")
+    
+    # 保存到报告目录
     os.makedirs('/tmp/reports', exist_ok=True)
     with open('/tmp/reports/' + fn + '.md', 'w', encoding='utf-8') as f:
         f.write("# 财经新闻汇总 - " + ds + " " + ts + "\n\n" + desp)
-
+    
+    # 保存到存档目录
+    archive_path = save_archive(desp, title, ts)
+    
+    # 推送到微信
     url = "https://sctapi.ftqq.com/" + SENDKEY + ".send"
     data = urllib.parse.urlencode({'title': title, 'desp': desp}).encode('utf-8')
     req = urllib.request.Request(url, data=data, method='POST', headers={'Content-Type': 'application/x-www-form-urlencoded'})
