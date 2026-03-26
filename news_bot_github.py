@@ -30,7 +30,6 @@ def get_yahoo(symbol):
         prev = meta.get('previousClose')
         if not price: return None
         pct = ((price - prev) / prev * 100) if prev and prev > 0 else 0
-        # 获取数据时间
         now = datetime.now().strftime("%H:%M")
         return {'price': round(price, 2), 'pct': round(pct, 2), 'time': now}
     except: return None
@@ -43,96 +42,6 @@ def get_em(secid):
         now = datetime.now().strftime("%H:%M")
         return {'price': round(d.get('f43', 0) / 100, 2), 'pct': round((d.get('f170') or 0) / 100, 2), 'time': now}
     except: return None
-
-# 翻译词典
-TRANS = {
-    'Trump': '特朗普', 'Biden': '拜登', 'Fed': '美联储', 'Federal Reserve': '美联储',
-    'Nagel': '纳格尔', 'Barrett': '巴雷特', 'Gorsuch': '戈萨奇', 'Powell': '鲍威尔',
-    'Henkel': '汉高', 'Olaplex': '欧拉普莱克斯', 'Meta': 'Meta', 'YouTube': 'YouTube',
-    'Next': 'Next', 'H&M': 'H&M', 'ECB': '欧洲央行', 'NS&I': '英国国民储蓄银行',
-    'Octopus': 'Octopus能源', 'Iran': '伊朗', 'Israel': '以色列', 'Reuters': '路透社',
-    'China': '中国', 'Chinese': '中国', 'US': '美国', 'U.S.': '美国', 'America': '美国', 'American': '美国',
-    'Russia': '俄罗斯', 'Ukraine': '乌克兰', 'Europe': '欧洲', 'European': '欧洲',
-    'UK': '英国', 'Germany': '德国', 'France': '法国', 'Middle East': '中东',
-    'Japan': '日本', 'Japanese': '日本', 'Korea': '韩国', 'India': '印度',
-    'Tehran': '德黑兰', 'Washington': '华盛顿',
-    'stock': '股票', 'stocks': '股市', 'market': '市场', 'markets': '市场',
-    'oil': '原油', 'gold': '黄金', 'bond': '债券', 'bonds': '债券',
-    'rate': '利率', 'rates': '利率', 'interest': '利息', 'inflation': '通胀',
-    'trade': '贸易', 'tariff': '关税', 'tariffs': '关税', 'tax': '税收',
-    'bank': '银行', 'banks': '银行', 'economy': '经济', 'economic': '经济',
-    'growth': '增长', 'recession': '衰退', 'crisis': '危机',
-    'price': '价格', 'prices': '价格', 'cost': '成本', 'costs': '成本',
-    'deal': '协议', 'agreement': '协议', 'contract': '合同',
-    'war': '战争', 'conflict': '冲突', 'tension': '紧张',
-    'sanction': '制裁', 'sanctions': '制裁',
-    'supply': '供应', 'demand': '需求',
-    'production': '生产', 'output': '产出',
-    'company': '公司', 'companies': '公司', 'firm': '公司',
-    'investor': '投资者', 'investors': '投资者',
-    'report': '报告', 'reports': '报告', 'data': '数据', 'survey': '调查',
-    'profit': '利润', 'revenue': '营收', 'earnings': '盈利',
-    'debt': '债务', 'loan': '贷款', 'credit': '信贷',
-    'energy': '能源', 'gas': '天然气', 'solar': '太阳能', 'panel': '电池板',
-    'hair care': '护发', 'brand': '品牌',
-    'compensation': '赔偿', 'customers': '客户', 'million': '百万', 'millions': '数百万',
-    'addiction': '成瘾', 'trial': '审判', 'liable': '有责任',
-    'speculation': '猜测', 'online': '网上', 'videos': '视频',
-    'turbulence': '动荡', 'fly': '飞行', 'airlines': '航空公司',
-    'contingency': '应急', 'plan': '计划', 'reopen': '重新开放',
-    'sales': '销售', 'start': '开始', 'year': '年',
-    'guidance': '业绩指引', 'still': '仍',
-    'option': '选项', 'April': '四月', 'hike': '加息',
-    'advances': '上涨', 'conflicting': '相互矛盾', 'comments': '评论',
-    'intention': '意图', 'hold': '举行', 'proposal': '提议', 'end': '结束',
-    'troops': '军队', 'troop': '军队', 'more': '更多', 'but': '但', 'may': '可能',
-    'nearing': '接近', 'disappoint': '不及预期', 'disappoints': '不及预期',
-    'foreign minister': '外长', 'minister': '部长',
-    'says': '表示', 'said': '表示', 'announced': '宣布', 'announces': '宣布',
-    'warns': '警告', 'warned': '警告', 'expects': '预计', 'expected': '预计',
-    'rise': '上涨', 'rises': '上涨', 'rising': '上涨', 'rose': '上涨',
-    'fall': '下跌', 'falls': '下跌', 'falling': '下跌', 'fell': '下跌',
-    'drop': '下跌', 'drops': '下跌', 'dropped': '下跌',
-    'gain': '上涨', 'gains': '上涨', 'surge': '飙升', 'surged': '飙升',
-    'decline': '下降', 'declines': '下降', 'slump': '暴跌', 'slumped': '暴跌',
-    'cut': '削减', 'cuts': '削减', 'reduce': '减少', 'reduced': '减少',
-    'increase': '增加', 'increases': '增加', 'raise': '提高', 'raised': '提高',
-    'lift': '上调', 'lifts': '上调', 'lifted': '上调',
-    'see': '预计', 'sees': '预计', 'saw': '预计',
-    'review': '审议', 'reviewed': '审议', 'being reviewed': '正在审议',
-    'squeeze': '施压', 'backfire': '适得其反',
-    'offer': '提出', 'found': '被认定',
-    'set': '将', 'pay': '支付',
-    'high': '高点', 'low': '低点', 'record': '纪录',
-    'weak': '疲软', 'strong': '强劲', 'major': '重大',
-    'landmark': '里程碑式', 'cryptic': '神秘', 'prolonged': '长期',
-    'key': '关键', 'latest': '最新',
-    'meeting': '会议', 'summit': '峰会', 'talk': '会谈', 'talks': '会谈',
-    'president': '总统', 'official': '官员', 'analysts': '分析师',
-    'central bank': '央行', 'government': '政府',
-    'policy': '政策', 'policies': '政策',
-    'decision': '决定', 'vote': '投票', 'election': '选举',
-    'Supreme Court': '最高法院', 'Congress': '国会', 'Senate': '参议院', 
-    'Justice': '大法官', 'Justices': '大法官',
-    'Wall Street': '华尔街', 'White House': '白宫',
-    'Treasury': '财政部', 'Securities': '证券',
-    'Bitcoin': '比特币', 'crypto': '加密货币',
-    'AI': '人工智能', 'technology': '科技', 'tech': '科技',
-    'semiconductor': '半导体', 'chip': '芯片', 'chips': '芯片',
-    'fueling': '引发', 'deletes': '删除', 'one': '一条',
-    'how': '如何', 'could': '可能', 'would': '将', 'will': '将',
-    'to': '将', 'for': '对', 'of': '的', 'in': '在', 'on': '在', 'at': '在',
-    'as': '因', 'since': '自', 'after': '在...之后',
-    'the': '', 'a': '', 'an': '', 'The': '', 'A': '', 'An': '',
-}
-
-def translate(text):
-    result = text
-    for en, zh in sorted(TRANS.items(), key=lambda x: -len(x[0])):
-        if en and zh:
-            result = re.sub(r'\b' + re.escape(en) + r'\b', zh, result, flags=re.IGNORECASE)
-    result = re.sub(r'\s+', ' ', result).strip()
-    return result
 
 def format_time(time_str):
     try:
@@ -183,17 +92,12 @@ def fetch_news():
                 if len(desc) > 200:
                     desc = desc[:197] + '...'
             
-            title_zh = translate(title)
-            desc_zh = translate(desc) if desc else ''
-            
             time_m = re.search(r'<pubDate>(.*?)</pubDate>', item, re.DOTALL)
             pub_time = format_time(time_m.group(1).strip()) if time_m else ''
             
             all_news.append({
                 'title': title,
-                'title_zh': title_zh,
                 'desc': desc,
-                'desc_zh': desc_zh,
                 'source': src,
                 'time': pub_time
             })
@@ -221,7 +125,6 @@ def main():
 
     print("\n[2/4] 获取市场数据...")
     market = {}
-    market_time = ts  # 数据采集时间
 
     for sym, name in [('^DJI', '道琼斯工业'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500'), ('AAPL', '苹果')]:
         r = get_yahoo(sym)
@@ -256,10 +159,6 @@ def main():
         lines.append("**" + str(i) + ". " + n['title'] + "**\n")
         if n['desc']:
             lines.append("   " + n['desc'] + "\n")
-        lines.append("   🇨🇳 " + n['title_zh'])
-        if n['desc_zh']:
-            lines.append("：" + n['desc_zh'])
-        lines.append("\n")
         lines.append("   — " + n['source'] + time_str + "\n\n")
 
     lines.append("\n---\n\n## 二、市场摘要\n")
