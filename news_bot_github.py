@@ -67,7 +67,7 @@ def get_sina_hk():
 print("\n[2/4] Fetching market data ...")
     market = {}
 
-for sym, name in [('^DJI', '道琼斯工业'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500'), ('AAPL', '苹果')]:
+    for sym, name in [('^DJI', '道琼斯工业'), ('^NDX', '纳斯达克100'), ('^GSPC', '标普500'), ('AAPL', '苹果')]:
         r = get_yahoo_quote(sym)
         if r:
             market[name] = {'price': r['price'], 'change_pct': r['change_pct'], 'src': 'Yahoo Finance'}
