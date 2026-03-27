@@ -17,6 +17,29 @@ def http_get(url, headers=None, timeout=15):
     except:
         return None
 
+def check_duplicate_push():
+    """检查最近30分钟内是否已经推送过，防止重复"""
+    try:
+        # 读取最后一次推送的时间戳
+        state_file = '/tmp/last_push_time.txt'
+        if os.path.exists(state_file):
+            with open(state_file, 'r') as f:
+                last_push_time = float(f.read().strip())
+                now = time.time()
+                # 如果距离上次推送不足30分钟，则跳过
+                if now - last_push_time < 1800:  # 30分钟 = 1800秒
+                    print(f"[防重复] 距离上次推送仅 {int(now - last_push_time)} 秒，跳过本次推送")
+                    return True
+    except:
+        pass
+    return False
+
+def record_push_time():
+    """记录本次推送的时间戳"""
+    state_file = '/tmp/last_push_time.txt'
+    with open(state_file, 'w') as f:
+        f.write(str(time.time()))
+
 def get_yahoo(symbol):
     url = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?interval=1d&range=2d"
     txt = http_get(url)
@@ -64,7 +87,7 @@ def format_time(time_str):
     return ''
 
 def fetch_news():
-    """获取国际财经新闻（英文）"""
+    """获取国际财经新闻（英文）- 来自权威媒体"""
     sources = [
         ('https://feeds.reuters.com/reuters/businessNews', 'Reuters'),
         ('https://feeds.bbci.co.uk/news/business/rss.xml', 'BBC'),
@@ -122,6 +145,11 @@ def save_archive(content, title, ts):
     return filepath
 
 def main():
+    # 防重复检查
+    if check_duplicate_push():
+        print("[防重复] 本次推送已被跳过")
+        return
+    
     now = datetime.now()
     ts = now.strftime("%H:%M")
     ds = now.strftime("%Y年%m月%d日")
@@ -393,6 +421,8 @@ def main():
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read().decode('utf-8'))
             print("  推送成功:", result)
+            # 记录本次推送时间
+            record_push_time()
     except Exception as e:
         print("  推送失败:", e)
 
