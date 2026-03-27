@@ -64,6 +64,7 @@ def format_time(time_str):
     return ''
 
 def fetch_news():
+    """获取国际财经新闻（英文）"""
     sources = [
         ('https://feeds.reuters.com/reuters/businessNews', 'Reuters'),
         ('https://feeds.bbci.co.uk/news/business/rss.xml', 'BBC'),
@@ -103,7 +104,7 @@ def save_archive(content, title, ts):
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H-%M")
     
-    # 存档目录: workspace/archives/YYYY-MM-DD/
+    # 存档目录: /tmp/archives/YYYY-MM-DD/
     archive_dir = os.path.join('/tmp', 'archives', date_str)
     os.makedirs(archive_dir, exist_ok=True)
     
